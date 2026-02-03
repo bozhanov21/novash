@@ -2,12 +2,15 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 )
 
 func main() {
+
 	for {
 		fmt.Print("$ ")
 
@@ -28,13 +31,9 @@ func main() {
 		case "type":
 			if len(args) == 0 {
 				fmt.Println()
-			} else {
-				if _, exists := get_method_bound_to_command(args[0]); exists {
-					fmt.Println(args[0] + " is a shell builtin")
-				} else {
-					fmt.Println(args[0] + ": not found")
-				}
+				break
 			}
+			handle_type_case(args[0])
 
 		default:
 			comand_func, exists := get_method_bound_to_command(command)
@@ -60,6 +59,64 @@ var known_commands = commands{
 	"type": func(args ...string) { /* returns the type (done separately) */ },
 }
 
+var (
+	ErrNotFound   = errors.New("not found")
+	ErrPermission = errors.New("permission denied")
+)
+
+func printResolveError(cmd string, err error) {
+	switch err {
+
+	case ErrNotFound:
+		fmt.Println(cmd + ": command not found")
+
+	case ErrPermission:
+		fmt.Println(cmd + ": permission denied")
+
+	default:
+		fmt.Println(cmd + ": error")
+	}
+}
+
+func handle_command(command string, args []string) {
+	if comand_function, exists := get_method_bound_to_command(command); exists {
+		comand_function(args...)
+		return
+	}
+
+	path, err := resolve_command(command)
+	if err != nil {
+		printResolveError(command, err)
+		return
+	}
+
+	//execve goes here
+	fmt.Println(command + " resolved to " + path)
+}
+
+func handle_type_case(cmd string) {
+	if _, exists := get_method_bound_to_command(cmd); exists {
+		fmt.Println(cmd + " is a shell builtin")
+		return
+	}
+
+	path, err := resolve_command(cmd)
+	if err != nil {
+		fmt.Println(cmd + ": not found")
+		return
+	}
+
+	fmt.Println(cmd + " is " + path)
+}
+
+func resolve_command(cmd string) (string, error) {
+	path, err := exec.LookPath(cmd)
+	if err != nil {
+		return "", ErrNotFound
+	}
+	return path, nil
+}
+
 func get_method_bound_to_command(command string) (func(args ...string), bool) {
 	comand_func, exists := known_commands[command]
 	return comand_func, exists
@@ -74,4 +131,3 @@ func parse_command(input string) (string, []string) {
 
 	return parts[0], nil
 }
-
