@@ -36,13 +36,7 @@ func main() {
 			handle_type_case(args[0])
 
 		default:
-			comand_func, exists := get_method_bound_to_command(command)
-
-			if exists {
-				comand_func(args...)
-			} else {
-				fmt.Println(command + ": command not found")
-			}
+			handle_command(command, args)
 
 		}
 
