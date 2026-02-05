@@ -44,38 +44,50 @@ func main() {
 
 type commands map[string]func(args ...string)
 
-var known_commands = commands{
-	"exit": func(args ...string) { os.Exit(0) },
+var known_commands commands
 
-	"echo": func(args ...string) { fmt.Println(strings.Join(args, " ")) },
+func init() {
+	known_commands = commands{
+		"exit": func(args ...string) { os.Exit(0) },
 
-	"type": func(args ...string) { /* returns the type (done separately) */ },
+		"echo": func(args ...string) { fmt.Println(strings.Join(args, " ")) },
 
-	"pwd": func(args ...string) {
-		if current_dir, err := os.Getwd(); err != nil {
-			fmt.Fprintln(os.Stderr, "pwd:", err)
-		} else {
-			fmt.Println(current_dir)
-		}
-	},
+		"type": func(args ...string) { /* returns the type (done separately) */ },
 
-	"cd": func(args ...string) {
-		path := args[0]
+		"pwd": func(args ...string) {
+			if current_dir, err := os.Getwd(); err != nil {
+				fmt.Fprintln(os.Stderr, "pwd:", err)
+			} else {
+				fmt.Println(current_dir)
+			}
+		},
 
-		if strings.HasPrefix(path, "~") {
-			dic, err := os.UserHomeDir()
+		"cd": func(args ...string) {
+			var path string
+
+			if args == nil {
+				path = "~"
+			} else {
+				path = args[0]
+			}
+
+			if strings.HasPrefix(path, "~") {
+				dic, err := os.UserHomeDir()
+				if err != nil {
+					fmt.Fprintln(os.Stderr, "cd:", args[0]+":", "Error finding HOME variable")
+					return
+				}
+				path = dic + path[1:]
+			}
+
+			err := os.Chdir(path)
 			if err != nil {
-				fmt.Fprintln(os.Stderr, "cd:", args[0]+":", "Error finding HOME variable")
+				fmt.Fprintln(os.Stderr, "cd:", args[0]+":", "No such file or directory")
 				return
 			}
-			path = dic + path[1:]
-		}
-
-		err := os.Chdir(path)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "cd:", args[0]+":", "No such file or directory")
-		}
-	},
+			handle_command("ls", nil)
+		},
+	}
 }
 
 var (
