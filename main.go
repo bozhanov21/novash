@@ -2,10 +2,12 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"strings"
 )
 
@@ -85,8 +87,7 @@ func init() {
 				fmt.Fprintln(os.Stderr, "cd:", args[0]+":", "No such file or directory")
 				return
 			}
-			cmd := exec.Command("ls")
-			handle_output(cmd)
+			handle_output("ls")
 		},
 	}
 }
@@ -113,6 +114,7 @@ func printResolveError(cmd string, err error) {
 func handle_command(command string, args []string) {
 	if comand_function, exists := get_method_bound_to_command(command); exists {
 		comand_function(args...)
+		lastExitCode = 0
 		return
 	}
 
@@ -122,27 +124,44 @@ func handle_command(command string, args []string) {
 		return
 	}
 
-	//use CommandContext?
-	cmd := exec.Command(command, args...)
-	handle_output(cmd)
+	handle_output(command, args...)
 }
 
 var lastExitCode int
 
-func handle_output(cmd *exec.Cmd) {
+func handle_output(command string, args ...string) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, command, args...)
+
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt)
+	defer signal.Stop(sig)
+
+	go func() {
+		select {
+
+		case <-sig:
+			cancel()
+
+		case <-ctx.Done():
+
+		}
+	}()
+
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
 	err := cmd.Run()
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			lastExitCode = exitErr.ExitCode()
-		} else {
-			lastExitCode = 1
-		}
-	} else {
+
+	if err == nil {
 		lastExitCode = 0
+	} else if exitErr, ok := err.(*exec.ExitError); ok {
+		lastExitCode = exitErr.ExitCode()
+	} else {
+		lastExitCode = 1
 	}
 }
 
@@ -183,4 +202,3 @@ func parse_command(input string) (string, []string) {
 
 	return parts[0], nil
 }
-
