@@ -207,15 +207,24 @@ func parse_command(input string) (string, []string) {
 
 	var args []string
 	var current strings.Builder
+	inOuterQuote := false
 	inQuote := false
 
 	for _, r := range arguments {
 		switch r {
+
+		case '"':
+			inOuterQuote = !inOuterQuote
+
 		case '\'':
-			inQuote = !inQuote
+			if !inOuterQuote {
+				inQuote = !inQuote
+			} else {
+				current.WriteRune(r)
+			}
 
 		case ' ':
-			if inQuote {
+			if inQuote || inOuterQuote {
 				current.WriteRune(r)
 			} else if current.Len() > 0 {
 				args = append(args, current.String())
