@@ -216,7 +216,7 @@ func parse_command(input string) (string, []string) {
 		switch r {
 
 		case '\\':
-			if preserve_next {
+			if preserve_next || inQuote {
 				current.WriteRune(r)
 				preserve_next = false
 			} else {
@@ -224,7 +224,7 @@ func parse_command(input string) (string, []string) {
 			}
 
 		case '"':
-			if preserve_next {
+			if preserve_next || inQuote {
 				current.WriteRune(r)
 				preserve_next = false
 			} else {
@@ -259,6 +259,12 @@ func parse_command(input string) (string, []string) {
 		default:
 			if preserve_next {
 				preserve_next = false
+
+				if inOuterQuote {
+					if r != '$' && r != '`' {
+						current.WriteRune('\\')
+					}
+				}
 			}
 			current.WriteRune(r)
 		}
