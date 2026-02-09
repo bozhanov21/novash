@@ -216,7 +216,25 @@ func parse_command(input string) (string, []string) {
 		return "", nil
 	}
 
-	command, arguments, exists := strings.Cut(trimmed, " ")
+	//implemeinting new stage
+	var quote_type string = " "
+
+	if strings.HasPrefix(trimmed, "\"") {
+		quote_type = "\""
+	} else if strings.HasPrefix(trimmed, "'") {
+		quote_type = "'"
+	}
+
+	without_quote, _ := strings.CutPrefix(trimmed, quote_type)
+
+	command, arguments, exists := strings.Cut(without_quote, quote_type)
+
+	if quote_type == "\"" {
+		command = strings.ReplaceAll(command, "\\\\", "\\")
+		command = strings.ReplaceAll(command, "\\\"", "\"")
+		command = strings.ReplaceAll(command, "\\$", "$")
+		command = strings.ReplaceAll(command, "\\`", "`")
+	}
 
 	if !exists {
 		return command, nil
