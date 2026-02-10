@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -18,34 +17,64 @@ func main() {
 	var args []string
 	var needs_more bool
 
+	interrupt_sig := make(chan os.Signal, 1)
+	input_sig := make(chan string, 1)
+	signal.Notify(interrupt_sig, os.Interrupt)
+	defer signal.Stop(interrupt_sig)
+
+	go func() {
+		defer close(input_sig)
+
+		for {
+			raw_string, err := bufio.NewReader(os.Stdin).ReadString('\n')
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "Error reading input", err)
+				os.Exit(1)
+				return
+			}
+
+			input_sig <- raw_string
+		}
+	}()
+
+NextPrompt:
 	for {
 		fmt.Print("$ ")
 
+	Input:
 		for {
 			if in_new_line {
 				fmt.Print(". ")
 			}
 
-			raw_string, err := bufio.NewReader(os.Stdin).ReadString('\n')
-			if err != nil {
-				fmt.Fprintln(os.Stderr, "Error reading input", err)
-				os.Exit(1)
+			select {
+
+			case <-interrupt_sig:
+				fmt.Println()
+				in_new_line = false
+				multi_string.Reset()
+				command = ""
+				goto NextPrompt
+
+			case raw_string, ok := <-input_sig:
+				if !ok {
+					os.Exit(0)
+				}
+
+				multi_string.WriteString(raw_string)
+
+				command, args, needs_more = parse_command(multi_string.String())
+
+				if needs_more {
+					in_new_line = true
+					continue
+				}
+
+				in_new_line = false
+				multi_string.Reset()
+				break Input
 			}
-
-			multi_string.WriteString(raw_string)
-
-			command, args, needs_more = parse_command(multi_string.String())
-
-			if needs_more {
-				in_new_line = true
-				continue
-			}
-
-			in_new_line = false
-			multi_string.Reset()
-			break
 		}
-
 		switch command {
 
 		case "":
@@ -151,25 +180,7 @@ func handle_command(command string, args []string) {
 var lastExitCode int
 
 func handle_output(command string, args ...string) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, command, args...)
-
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt)
-	defer signal.Stop(sig)
-
-	go func() {
-		select {
-
-		case <-sig:
-			cancel()
-
-		case <-ctx.Done():
-
-		}
-	}()
+	cmd := exec.Command(command, args...)
 
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
@@ -330,4 +341,3 @@ func lex_input(arguments string) lexar_output {
 		state:  state,
 	}
 }
-
