@@ -210,6 +210,10 @@ loop:
 			num = 2
 			shouldAppend = false
 
+		case "&>":
+			num = 3
+			shouldAppend = false
+
 		case ">>", "1>>":
 			shouldAppend = true
 			num = 1
@@ -217,6 +221,10 @@ loop:
 		case "2>>":
 			shouldAppend = true
 			num = 2
+
+		case "&>>":
+			shouldAppend = true
+			num = 3
 
 		default:
 			continue
@@ -284,6 +292,11 @@ func handle_builtin_output(fn func(args ...string), arguments []string, outputFi
 	case 2:
 		oldStdErr = os.Stderr
 		os.Stderr = file
+	case 3:
+		oldStdOut = os.Stdout
+		os.Stdout = file
+		oldStdErr = os.Stderr
+		os.Stderr = file
 	}
 
 	defer func() {
@@ -291,6 +304,9 @@ func handle_builtin_output(fn func(args ...string), arguments []string, outputFi
 		case 1:
 			os.Stdout = oldStdOut
 		case 2:
+			os.Stderr = oldStdErr
+		case 3:
+			os.Stdout = oldStdOut
 			os.Stderr = oldStdErr
 		}
 	}()
@@ -341,6 +357,9 @@ func handle_output(command string, args []string, outputFile string, num int, sh
 		case 2:
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = file
+		case 3:
+			cmd.Stderr = file
+			cmd.Stdout = file
 		}
 
 	} else {
